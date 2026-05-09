@@ -13,8 +13,8 @@ if 'tasks' not in st.session_state:
 st.sidebar.header("Add New Task")
 with st.sidebar.form("task_form", clear_on_submit=True):
     task_name = st.text_input("Task Name")
-    assignee = st.selectbox("Assignee", ["Kimok", "Alice", "Bob", "Charlie", "Unassigned"])
-    status = st.select_slider("Initial Status", options=["Backlog", "In Progress", "Review", "Done"])
+    assignee = st.selectbox("Assignee", ["Kimo", "Alice", "Bob", "Charlie", "Unassigned"])
+    status = st.select_slider("Initial Status", options=["Backlog", "In Progress", "In Review", "Approved", "Completed"])
     due_date = st.date_input("Due Date", date.today())
     
     submit = st.form_submit_button("Add Task")
