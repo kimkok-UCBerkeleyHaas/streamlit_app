@@ -31,7 +31,7 @@ def compute_mse(slope, intercept, x, y):
     return mse
 
 # Streamlit app
-st.title("Savio's Interactive Regression App")
+st.title("KimKok's Interactive Regression App")
 
 # Slope and intercept input fields
 st.sidebar.subheader("Adjust the Slope and Intercept")
