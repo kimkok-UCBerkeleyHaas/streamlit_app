@@ -1,9 +1,15 @@
+import os
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+# ─── Persistent CSV path ──────────────────────────────────────────────────────
+# Edits made in the app are saved here; on first run the hardcoded defaults are
+# written to this file so subsequent sessions load user-saved data.
+CSV_PATH = "data/properties.csv"
 
 # ─── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -187,89 +193,92 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Data ─────────────────────────────────────────────────────────────────────
-@st.cache_data
-def load_data():
-    data = {
-        "No": [1, 2, 3, 4, 7, 5, 6],
-        "Project Name": [
-            "Aurum @ Bandar Sunway",
-            "The Atera 2",
-            "M Terra",
-            "Residensi Rimba Flora",
-            "The Avantro",
-            "Residensi Ria",
-            "Quayside Plaza",
-        ],
-        "Price (RM)": [265000, 270000, 250000, 270000, 250000, 250000, 250000],
-        "Developer": [
-            "Shayher Group",
-            "Paramount Property",
-            "Mah Sing",
-            "Trinity Group",
-            "Chin Hin",
-            "Sime Darby",
-            "Gamuda",
-        ],
-        "Title": [
-            "Leasehold", "Leasehold", "Leasehold",
-            "Freehold", "Freehold", "Freehold", "Leasehold",
-        ],
-        "Size (sqft)": [550, 555, 550, 550, 550, 550, 549],
-        "Price/sqft (RM)": [482, 486, 455, 491, 455, 455, 455],
-        "Rooms": [2, 2, "1+1", 2, 2, 2, 2],
-        "Bathroom": [
-            "Separate bath & WC",
-            "Attached bath & WC",
-            "1 bath",
-            "2 bath",
-            "1 bath",
-            "1 bath",
-            "1 bath",
-        ],
-        "Completion": [
-            "Q2 2030", "End 2027/Early 2028", "2028",
-            "2028", "Jan 2028", "End 2027/Early 2028", "Oct 2026",
-        ],
-        "Location": [
-            "Sunway", "Petaling Jaya", "Puchong",
-            "Bandar Kinrara (near Pavilion Bkt Jalil)",
-            "Bandar Kinrara (near Pavilion Bkt Jalil)",
-            "Subang", "Kota Kemuning",
-        ],
-        "FOC": [
-            "2 aircon + 1 heater",
-            "Kitchen cabinet, countertop, hood & hob, shower screen, water heater",
-            "None",
-            "—",
-            "—",
-            "—",
-            "—",
-        ],
-        "Units (RSK)": [734, None, None, 80, 208, 961, None],
-        "Website": [
-            "https://aurumbandarsunway.com/",
-            "https://paramountproperty.my/developments/the-atera/the-atera-phase-2/",
-            "https://mterra.com.my/",
-            "https://rainfora.com.my/",
-            "https://www.residensiwilayahpersekutuan.com/avantro-bandar-kinrara-puchong-rumah-selangor",
-            "https://www.simedarbyproperty.com/sj7/",
-            "https://www.gamudaland.com.my/developments/township/township/quayside-plazas-serviced-apartments",
-        ],
+# ─── Data helpers ─────────────────────────────────────────────────────────────
+DEFAULT_DATA = {
+    "Project Name": [
+        "Aurum @ Bandar Sunway", "The Atera 2", "M Terra",
+        "Residensi Rimba Flora", "The Avantro", "Residensi Ria", "Quayside Plaza",
+    ],
+    "Price (RM)": [265000, 270000, 250000, 270000, 250000, 250000, 250000],
+    "Developer": [
+        "Shayher Group", "Paramount Property", "Mah Sing",
+        "Trinity Group", "Chin Hin", "Sime Darby", "Gamuda",
+    ],
+    "Title": ["Leasehold", "Leasehold", "Leasehold", "Freehold", "Freehold", "Freehold", "Leasehold"],
+    "Size (sqft)": [550, 555, 550, 550, 550, 550, 549],
+    "Price/sqft (RM)": [482, 486, 455, 491, 455, 455, 455],
+    "Rooms": ["2", "2", "1+1", "2", "2", "2", "2"],
+    "Bathroom": [
+        "Separate bath & WC", "Attached bath & WC", "1 bath",
+        "2 bath", "1 bath", "1 bath", "1 bath",
+    ],
+    "Completion": [
+        "Q2 2030", "End 2027/Early 2028", "2028",
+        "2028", "Jan 2028", "End 2027/Early 2028", "Oct 2026",
+    ],
+    "Location": [
+        "Sunway", "Petaling Jaya", "Puchong",
+        "Bandar Kinrara (near Pavilion Bkt Jalil)",
+        "Bandar Kinrara (near Pavilion Bkt Jalil)",
+        "Subang", "Kota Kemuning",
+    ],
+    "FOC": [
+        "2 aircon + 1 heater",
+        "Kitchen cabinet, countertop, hood & hob, shower screen, water heater",
+        "None", "—", "—", "—", "—",
+    ],
+    "Units (RSK)": [734, None, None, 80, 208, 961, None],
+    "Website": [
+        "https://aurumbandarsunway.com/",
+        "https://paramountproperty.my/developments/the-atera/the-atera-phase-2/",
+        "https://mterra.com.my/",
+        "https://rainfora.com.my/",
+        "https://www.residensiwilayahpersekutuan.com/avantro-bandar-kinrara-puchong-rumah-selangor",
+        "https://www.simedarbyproperty.com/sj7/",
+        "https://www.gamudaland.com.my/developments/township/township/quayside-plazas-serviced-apartments",
+    ],
+}
+
+def _derive_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add/refresh computed helper columns from editable fields."""
+    df = df.copy()
+    df["Rooms"] = df["Rooms"].astype(str).str.strip()
+    df["Rooms_num"] = df["Rooms"].apply(lambda x: 2 if "1+1" in x else int(x) if x.isdigit() else 2)
+    df["Bathrooms_num"] = df["Bathroom"].apply(lambda x: 2 if "2 bath" in str(x) else 1)
+    completion_map = {
+        "Q2 2030": 2030.25, "End 2027/Early 2028": 2027.75,
+        "2028": 2028.0, "Jan 2028": 2028.0, "Oct 2026": 2026.75,
     }
-    df = pd.DataFrame(data)
-    df["Rooms_num"] = df["Rooms"].apply(lambda x: 2 if x == "1+1" else int(x))
-    df["Bathrooms_num"] = df["Bathroom"].apply(lambda x: 2 if "2 bath" in x else 1)
-    # Estimated completion year
-    completion_year_map = {
-        "Q2 2030": 2030.25, "End 2027/Early 2028": 2028.0,
-        "2028": 2028.0, "Jan 2028": 2028.0,
-        "End 2027/Early 2028": 2027.75, "Oct 2026": 2026.75,
-    }
-    df["Completion_Year"] = df["Completion"].map(completion_year_map).fillna(2028.0)
+    df["Completion_Year"] = df["Completion"].map(completion_map).fillna(2028.0)
     return df
 
-df = load_data()
+def load_data() -> pd.DataFrame:
+    """Load from saved CSV; fall back to hardcoded defaults on first run."""
+    if os.path.exists(CSV_PATH):
+        df = pd.read_csv(CSV_PATH)
+    else:
+        os.makedirs("data", exist_ok=True)
+        df = pd.DataFrame(DEFAULT_DATA)
+        df.to_csv(CSV_PATH, index=False)
+    return _derive_columns(df)
+
+def save_data(df: pd.DataFrame):
+    """Persist the editable columns back to CSV."""
+    os.makedirs("data", exist_ok=True)
+    editable_cols = [
+        "Project Name", "Price (RM)", "Developer", "Title", "Size (sqft)",
+        "Price/sqft (RM)", "Rooms", "Bathroom", "Completion", "Location",
+        "FOC", "Units (RSK)", "Website",
+    ]
+    cols_to_save = [c for c in editable_cols if c in df.columns]
+    df[cols_to_save].to_csv(CSV_PATH, index=False)
+
+# ─── Session-state bootstrap ───────────────────────────────────────────────────
+# Use session_state so in-memory edits survive Streamlit reruns within a session.
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
+
+df = st.session_state.df
 
 # ─── Sidebar Filters ──────────────────────────────────────────────────────────
 with st.sidebar:
@@ -299,8 +308,8 @@ with st.sidebar:
 
     location_filter = st.multiselect(
         "Location",
-        options=sorted(df["Location"].unique()),
-        default=list(df["Location"].unique()),
+        options=sorted(st.session_state.df["Location"].unique()),
+        default=list(st.session_state.df["Location"].unique()),
     )
 
     st.divider()
@@ -314,10 +323,11 @@ with st.sidebar:
     w_foc = st.slider("FOC Items Bonus", 0, 10, 4)
 
 # ─── Filter data ──────────────────────────────────────────────────────────────
-filtered = df[
-    (df["Price (RM)"] <= max_price) &
-    (df["Title"].isin(title_filter)) &
-    (df["Location"].isin(location_filter))
+_df = st.session_state.df
+filtered = _df[
+    (_df["Price (RM)"] <= max_price) &
+    (_df["Title"].isin(title_filter)) &
+    (_df["Location"].isin(location_filter))
 ].copy()
 
 # ─── Scoring ──────────────────────────────────────────────────────────────────
@@ -360,7 +370,7 @@ with col1:
     st.markdown(f"""<div class="metric-card">
         <div class="metric-label">Projects Listed</div>
         <div class="metric-value">{len(filtered)}</div>
-        <div class="metric-sub">of {len(df)} total</div>
+        <div class="metric-sub">of {len(st.session_state.df)} total</div>
     </div>""", unsafe_allow_html=True)
 with col2:
     st.markdown(f"""<div class="metric-card">
@@ -401,7 +411,7 @@ st.markdown(f"""<div class="best-pick">
 </div>""", unsafe_allow_html=True)
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Property Cards", "📊 Charts", "📈 Comparison Table", "🗺️ Location Map"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Property Cards", "📊 Charts", "📈 Comparison Table", "🗺️ Location Map", "✏️ Edit Data"])
 
 # ── Tab 1: Property Cards ──
 with tab1:
@@ -746,12 +756,88 @@ with tab4:
     }
     st.dataframe(pd.DataFrame(dist_data), use_container_width=True, hide_index=True)
 
+# ── Tab 5: Edit Data ──
+with tab5:
+    st.markdown('<div class="section-header">✏️ Edit Property Dataset</div>', unsafe_allow_html=True)
+    st.caption(
+        "Add, edit, or remove rows below. Click **💾 Save Changes** to persist to CSV and refresh all charts. "
+        "Use **🔄 Reset to Defaults** to restore the original 7 properties."
+    )
+
+    EDITABLE_COLS = [
+        "Project Name", "Price (RM)", "Developer", "Title",
+        "Size (sqft)", "Price/sqft (RM)", "Rooms", "Bathroom",
+        "Completion", "Location", "FOC", "Units (RSK)", "Website",
+    ]
+    edit_df = st.session_state.df[[c for c in EDITABLE_COLS if c in st.session_state.df.columns]].copy()
+
+    edited = st.data_editor(
+        edit_df,
+        num_rows="dynamic",          # allows adding & deleting rows
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Project Name":    st.column_config.TextColumn("Project Name",    required=True, width="large"),
+            "Price (RM)":      st.column_config.NumberColumn("Price (RM)",     min_value=0,   format="RM %d"),
+            "Developer":       st.column_config.TextColumn("Developer",        width="medium"),
+            "Title":           st.column_config.SelectboxColumn("Title",       options=["Freehold", "Leasehold"], required=True),
+            "Size (sqft)":     st.column_config.NumberColumn("Size (sqft)",    min_value=0,   format="%d sqft"),
+            "Price/sqft (RM)": st.column_config.NumberColumn("Price/sqft (RM)",min_value=0,   format="RM %d"),
+            "Rooms":           st.column_config.TextColumn("Rooms",            help="e.g. 2 or 1+1"),
+            "Bathroom":        st.column_config.TextColumn("Bathroom"),
+            "Completion":      st.column_config.TextColumn("Completion",       help="e.g. Q2 2030, Oct 2026"),
+            "Location":        st.column_config.TextColumn("Location"),
+            "FOC":             st.column_config.TextColumn("FOC",              help="Free items; use — if none"),
+            "Units (RSK)":     st.column_config.NumberColumn("Units (RSK)",    min_value=0,   format="%d units"),
+            "Website":         st.column_config.LinkColumn("Website",          display_text="🔗 Open"),
+        },
+        key="data_editor",
+    )
+
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    btn_col1, btn_col2, btn_col3 = st.columns([2, 2, 3])
+
+    with btn_col1:
+        if st.button("💾 Save Changes", type="primary", use_container_width=True):
+            if edited.empty or edited["Project Name"].isnull().all():
+                st.error("Dataset cannot be empty — please keep at least one row.")
+            else:
+                new_df = _derive_columns(edited.dropna(subset=["Project Name"]))
+                st.session_state.df = new_df
+                save_data(new_df)
+                st.success("✅ Changes saved! All charts have been updated.")
+                st.rerun()
+
+    with btn_col2:
+        csv_bytes = edit_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download CSV",
+            data=csv_bytes,
+            file_name="Rumah_SelangorKu_properties.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with btn_col3:
+        with st.expander("🔄 Reset to original defaults", expanded=False):
+            st.warning("This will discard **all edits** and restore the original 7 properties.")
+            if st.button("⚠️ Yes, reset now", type="secondary"):
+                if os.path.exists(CSV_PATH):
+                    os.remove(CSV_PATH)
+                st.session_state.df = load_data()
+                st.success("✅ Reset to defaults.")
+                st.rerun()
+
+    st.divider()
+    st.markdown('<div class="section-header">📋 Current Dataset Preview</div>', unsafe_allow_html=True)
+    st.caption(f"{len(st.session_state.df)} properties in dataset · Click any cell above to edit · \u2795 Add rows with the ＋ button at the bottom of the table")
+
 # ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="divider"></div>
 <div style='text-align:center; color:#475569; font-size:0.78rem; padding: 1rem 0 2rem;'>
     📊 Data sourced from Rumah SelangorKu Comparison · July 2026 &nbsp;|&nbsp;
     🎓 UC Berkeley ML/AI Certification Program &nbsp;|&nbsp;
-    Built with Streamlit & Plotly
+    Built with Streamlit &amp; Plotly
 </div>
 """, unsafe_allow_html=True)
